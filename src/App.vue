@@ -1,152 +1,184 @@
 <template>
   <div id="app">
-    <img
-      class="bg_left"
-      src="./assets/bg_left.png"
-    >
-    <div
-      id="main"
-      style="width: 1200px;height:700px;"
-    ></div>
+    <img class="bg_left" src="./assets/bg_left.png">
+    <div class="month">{{month}}月</div>
+    <div id="main" style="width: 1200px;height:700px;"></div>
     <div class="bg_right">
       <div class="top">
-        <img
-          class="avatar"
-          src="./assets/bg_left.png"
-        />
-        <img
-          class="avatar_top"
-          src="./assets/avatar_top.png"
-        />
-        <img
-          class="avatar_footer"
-          src="./assets/avatar_footer.png"
-        />
+        <img class="avatar" :src="avatarList[0].portrait">
+        <img class="avatar_top" src="./assets/avatar_top.png">
+        <img class="avatar_footer" src="./assets/avatar_footer.png">
         <div class="avatar_footer number1">NO.1</div>
         <div class="title">{{avatarList[0].realname}}</div>
         <div class="disc">{{avatarList[0].departname}}</div>
       </div>
       <div class="left">
-        <img
-          class="avatar"
-          src="./assets/bg_left.png"
-        />
-        <img
-          class="avatar_top"
-          src="./assets/avatar_top.png"
-        />
-        <img
-          class="avatar_footer"
-          src="./assets/avatar_footer.png"
-        />
+        <img class="avatar" :src="avatarList[1].portrait">
+        <img class="avatar_top" src="./assets/avatar_top.png">
+        <img class="avatar_footer" src="./assets/avatar_footer.png">
         <div class="avatar_footer number">NO.2</div>
-        <div class="title">{{avatarList[0].realname}}</div>
-        <div class="disc">{{avatarList[0].departname}}</div>
+        <div class="title">{{avatarList[1].realname}}</div>
+        <div class="disc">{{avatarList[1].departname}}</div>
       </div>
       <div class="right1">
-        <img
-          class="avatar_right"
-          src="./assets/bg_left.png"
-        />
-        <img
-          class="avatar_top"
-          src="./assets/avatar_top.png"
-        />
-        <img
-          class="avatar_footer"
-          src="./assets/avatar_footer.png"
-        />
+        <img class="avatar_right" :src="avatarList[2].portrait">
+        <img class="avatar_top" src="./assets/avatar_top.png">
+        <img class="avatar_footer" src="./assets/avatar_footer.png">
         <div class="avatar_footer number">NO.3</div>
-        <div class="title">{{avatarList[0].realname}}</div>
-        <div class="disc">{{avatarList[0].departname}}</div>
+        <div class="title">{{avatarList[2].realname}}</div>
+        <div class="disc">{{avatarList[2].departname}}</div>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import axios from 'axios'
-const echarts = require('echarts/lib/echarts');
+import axios from "axios";
+import { setTimeout } from "timers";
+const echarts = require("echarts/lib/echarts");
 // 引入柱状图
-require('echarts/lib/chart/bar');
-require('echarts/lib/component/tooltip');
-require('echarts/lib/component/title');
-require('echarts/lib/component/legend')
+require("echarts/lib/chart/bar");
+require("echarts/lib/component/tooltip");
+require("echarts/lib/component/title");
+require("echarts/lib/component/legend");
 
 let dataList;
 export default {
-  name: 'app',
-  components: {
-  },
+  name: "app",
+  components: {},
   data() {
     return {
-      avatarList: [{
-        realname: '',
-        departname: ''
-      }]
-    }
+      month: "",
+      avatarList: [
+        {
+          realname: "",
+          departname: "",
+          portrait: ""
+        },
+        {
+          realname: "",
+          departname: "",
+          portrait: ""
+        },
+        {
+          realname: "",
+          departname: "",
+          portrait: ""
+        }
+      ]
+    };
   },
   methods: {
     getData() {
       let date = new Date();
-      let Month = date.getMonth() + 1 < 10 ? '0' + (date.getMonth() + 1) : date.getMonth() + 1;
-      return axios.post('http://localhost:3000/getList', {
-        date: `${date.getFullYear()}${Month}`
-      })
+      this.month = this.transMonth(date.getMonth());
+      if (date.getDate() <= 20) {
+        this.type = "做账";
+      } else {
+        this.type = "报税";
+      }
+      let Month =
+        date.getMonth() + 1 < 10
+          ? "0" + (date.getMonth() + 1)
+          : date.getMonth() + 1;
+      return axios.get("/order/accounter/honorOfAccountantListOfNew", {
+        params: {
+          date: `${date.getFullYear()}${Month}`
+        }
+      });
+    },
+    handleData() {
+      var myChart = echarts.init(document.getElementById("main"));
+      let xAxis;
+      this.getData().then(v => {
+        dataList = v.data.data;
+        this.avatarList = dataList.grList;
+        if (dataList.grList) {
+          this.avatarList.forEach((v, i) => {
+            this.avatarList[i].portrait = `/api/assets/${v.portrait}`;
+          });
+        }
+        this.xAxis = dataList.groupList.map(v => v.departname);
+        this.noFinish = dataList.groupList.map(
+          v => (v.notFinish / v.allCount) * v.personCount
+        );
+        this.todayFinish = dataList.groupList.map(
+          v => (v.todayFinish / v.allCount) * v.personCount
+        );
+        this.finished = dataList.groupList.map(
+          v => (v.finish / v.allCount) * v.personCount
+        );
+
+        myChart.setOption({
+          title: {
+            text: "报税进度展示",
+            left: "460",
+            top: "80",
+            textStyle: {
+              fontSize: 30
+            }
+          },
+          tooltip: {},
+          xAxis: {
+            data: this.xAxis
+          },
+          legend: {
+            data: ["本月未完", "今日完成", "本月完成"],
+            bottom: "100",
+            left: "-10",
+            orient: "vertical"
+          },
+          yAxis: {
+            show: false
+          },
+          series: [
+            {
+              name: "本月未完",
+              type: "bar",
+              stack: "报税",
+              data: this.noFinish
+            },
+            {
+              name: "今日完成",
+              type: "bar",
+              stack: "报税",
+              data: this.todayFinish
+            },
+            {
+              name: "本月完成",
+              type: "bar",
+              stack: "报税",
+              data: this.finished
+            }
+          ]
+        });
+      });
+    },
+    transMonth(index) {
+      const dic = [
+        "一",
+        "二",
+        "三",
+        "四",
+        "五",
+        "六",
+        "七",
+        "八",
+        "九",
+        "十",
+        "十一",
+        "十二"
+      ];
+      return dic[index];
     }
   },
   mounted() {
-    var myChart = echarts.init(document.getElementById('main'));
-    let xAxis;
-    this.getData().then(v => {
-      dataList = v.data.data;
-      this.avatarList = dataList.grList
-      console.log(this.avatarList)
-      console.log(dataList)
-      this.xAxis = dataList.groupList.map(v => v.departname)
-      myChart.setOption({
-        title: {
-          text: '报税进度展示',
-          left: '460',
-          top: '80',
-          textStyle: {
-            fontSize: 30
-          }
-        },
-        tooltip: {},
-        xAxis: {
-          data: this.xAxis
-        },
-        legend: {
-          data: ['本月未完', '今日完成', '本月完成'],
-          bottom: '100',
-          left: '-10',
-          orient: 'vertical'
-        },
-        yAxis: {
-          show: false
-        },
-        series: [{
-          name: "本月未完",
-          type: 'bar',
-          stack: '报税',
-          data: [120, 132, 101, 134]
-        },
-        {
-          name: "今日完成",
-          type: 'bar',
-          stack: '报税',
-          data: [120, 132, 101, 134]
-        }, {
-          name: "本月完成",
-          type: 'bar',
-          stack: '报税',
-          data: [120, 132, 101, 134]
-        }]
-      });
-    })
+    this.handleData();
+    setInterval(() => {
+      this.handleData();
+    }, 180000);
   }
-}
+};
 </script>
 
 <style>
@@ -164,6 +196,16 @@ body {
   height: 100vh;
   padding-top: 1px;
   overflow: hidden;
+  position: relative;
+}
+
+.month {
+  position: absolute;
+  font-size: 30px;
+  font-weight: 700;
+  color: #ffffff;
+  left: 400px;
+  top: 130px;
 }
 
 .bg_left {
@@ -196,9 +238,10 @@ body {
   color: #000;
 }
 .avatar {
+  box-sizing: content-box;
   display: block;
   margin: 60px auto 0;
-  padding-right: 20px;
+  padding-right: 10px;
   width: 150px;
   height: 150px;
   border-radius: 50%;
